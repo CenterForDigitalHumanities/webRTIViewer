@@ -1,19 +1,13 @@
-	*
-	{
+	*{
+		-webkit-user-select: none;
+		-khtml-user-select: none;
+		-moz-user-select: -moz-none;
+		-o-user-select: none;
 		outline: none;
 	}
 
-	body
+	.toolbarButton, .toolbarButton2
 	{
-		/*margin: 0px;*/
-		overflow: hidden;
-		/*height: 100%;*/
-	}
-	
-	.toolbarButton
-	{
-		width: 40px !important;
-		height: 40px !important;
 		margin-bottom: 10px !important;
 		background: rgba(0, 0, 0, 0.0) !important;
 		border: 0px !important;
@@ -23,7 +17,7 @@
 	{
 		width: 100%;
 		height: 100%;
-		background-size: 100%;
+		background-size: contain;
 		left: 0px !important;
 		top: 0px !important;
 		margin: 0px !important;

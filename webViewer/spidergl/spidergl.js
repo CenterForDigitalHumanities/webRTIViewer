@@ -7539,6 +7539,9 @@ function _SglCanvasManager(canvasID, handler, updateRate) {
 	this.ui = ui;
 
 	var mgr = this;
+	
+	this.touchAction = 0;
+	this.touchDist = 0;
 
 	this.gl      = gl;
 	this.canvas  = canvas;
@@ -7573,9 +7576,9 @@ function _SglCanvasManager(canvasID, handler, updateRate) {
 	this.canvas.addEventListener("mouseout",        function(e) { mgr.mouseOut    (e); }, false);
 	this.canvas.addEventListener("mouseover",       function(e) { mgr.mouseOver    (e); }, false);
 	
-	this.canvas.addEventListener("touchstart",      function(e) { mgr.touchStart  (e); }, false);
-	this.canvas.addEventListener("touchend",        function(e) { mgr.touchEnd    (e); }, false);
-	this.canvas.addEventListener("touchmove",       function(e) { mgr.touchMove   (e); }, false);
+	this.canvas.addEventListener("touchstart",      function(e) { mgr.manageTouchStart(e); }, false);
+	this.canvas.addEventListener("touchend",        function(e) { mgr.manageTouchEnd(e); }, false);
+	this.canvas.addEventListener("touchmove",       function(e) { mgr.manageTouchMove(e);}, false);
 	
 	this.load();
 
@@ -7829,7 +7832,7 @@ _SglCanvasManager.prototype = {
 			 * and negative, if wheel was scrolled down.
 			 */
 			if (delta) {
-				if (this.handler.mouseWheel(this.gl, delta, x, y) != false) {
+				if (this.handler.mouseWheel(this.gl, delta, x, y, true) != false) {
 					this.requestDraw();
 				}
 			}
@@ -7845,64 +7848,136 @@ _SglCanvasManager.prototype = {
 		//e.returnValue = false;
 	},
 
-	touchStart : function(e) {
-		this.ui.mouseDownEvent = e.touches[0];
-		var xy = this._getMouseClientPos(e.touches[0]);
-		var x = xy.x;
-		var y = this.canvas.height - 1 - xy.y;
-		this.ui.mousePrevPos.x = x;
-		this.ui.mousePrevPos.y = y;
-		this.ui.mousePos.x = x;
-		this.ui.mousePos.y = y;
-		this.ui.mouseDeltaPos.x = 0;
-		this.ui.mouseDeltaPos.y = 0;
-		this.ui.mouseButtonsDown[0] = true;
-		if (this.handler.mouseDown) {
-			if (this.handler.mouseDown(this.gl, 0, x, y) != false) {
-				this.requestDraw();
+	
+	manageTouchStart : function(e) {
+		if (e.targetTouches.length == 1)
+		{
+			this.ui.mouseDownEvent = e.targetTouches[0];
+			var xy = this._getMouseClientPos(e.targetTouches[0]);
+			var x = xy.x;
+			var y = this.canvas.height - 1 - xy.y;
+			this.ui.mousePrevPos.x = x;
+			this.ui.mousePrevPos.y = y;
+			this.ui.mousePos.x = x;
+			this.ui.mousePos.y = y;
+			this.ui.mouseDeltaPos.x = 0;
+			this.ui.mouseDeltaPos.y = 0;
+			this.ui.mouseButtonsDown[0] = true;
+			if (this.handler.mouseDown) {
+				if (this.handler.mouseDown(this.gl, 0, x, y) != false) {
+					this.requestDraw();
+				}
+			}
+			this.canvas.focus();
+			if (e.preventDefault) {
+				e.preventDefault();
+			}
+			this.touchAction = 1;
+		}
+		else if (e.targetTouches.length == 2)
+		{
+			this.touchAction = 2;
+			var touch0 = this._getMouseClientPos(e.targetTouches[0]);
+			touch0.y = this.canvas.height - 1 - touch0.y;
+			var touch1 = this._getMouseClientPos(e.targetTouches[1]);
+			touch1.y = this.canvas.height - 1 - touch1.y;
+			var x = (touch0.x + touch1.x) / 2.0;
+			var y = (touch0.y + touch1.y) / 2.0;
+			this.ui.mousePrevPos.x = x;
+			this.ui.mousePrevPos.y = y;
+			this.ui.mousePos.x = x;
+			this.ui.mousePos.y = y;
+			this.ui.mouseDeltaPos.x = 0;
+			this.ui.mouseDeltaPos.y = 0;
+			var dist = Math.sqrt((touch0.x - touch1.x)*(touch0.x - touch1.x) + (touch0.y - touch1.y)*(touch0.y - touch1.y));
+			this.touchDist = dist;
+			if (this.handler.startPinch) {
+				if (this.handler.startPinch(this.gl, 0, x, y) != false) {
+					this.requestDraw();
+				}
+			}
+			if (e.preventDefault) {
+				e.preventDefault();
+			}
+			
+		}
+	},
+	
+	
+	manageTouchMove : function(e) {
+		if (e.targetTouches.length == 1)
+		{
+			if (this.touchAction != 1)
+			{
+				this.ui.mouseButtonsDown[0] = false;
+				this.manageTouchStart(e);
+				return;
+			}
+			this.touchAction = 1;
+			this.ui.mouseMoveEvent = e.targetTouches[0];
+			var xy = this._getMouseClientPos(e.targetTouches[0]);
+			var x = xy.x;
+			var y = this.canvas.height - 1 - xy.y;
+			this.ui.mousePrevPos.x = this.ui.mousePos.x;
+			this.ui.mousePrevPos.y = this.ui.mousePos.y;
+			this.ui.mousePos.x = x;
+			this.ui.mousePos.y = y;
+			this.ui.mouseDeltaPos.x = this.ui.mousePos.x - this.ui.mousePrevPos.x;
+			this.ui.mouseDeltaPos.y = this.ui.mousePos.y - this.ui.mousePrevPos.y;
+			if (this.handler.mouseMove) {
+				if (this.handler.mouseMove(this.gl, x, y) != false) {
+					this.requestDraw();
+				}
+			}
+			if (e.preventDefault) {
+				e.preventDefault();
 			}
 		}
-		this.canvas.focus();
-		if (e.preventDefault) {
-			e.preventDefault();
+		else if (e.targetTouches.length == 2)
+		{
+			/*if (this.touchAction != 2)
+			{
+				this.ui.mouseButtonsDown[0] = false;
+				this.manageTouchStart(e);
+				return;
+			}*/
+			this.touchAction = 2;
+			var touch0 = this._getMouseClientPos(e.targetTouches[0]);
+			touch0.y = this.canvas.height - 1 - touch0.y;
+			var touch1 = this._getMouseClientPos(e.targetTouches[1]);
+			touch1.y = this.canvas.height - 1 - touch1.y;
+			var x = (touch0.x + touch1.x) / 2.0;
+			var y = (touch0.y + touch1.y) / 2.0;
+			this.ui.mousePrevPos.x = x;
+			this.ui.mousePrevPos.y = y;
+			this.ui.mousePos.x = x;
+			this.ui.mousePos.y = y;
+			this.ui.mouseDeltaPos.x = 0;
+			this.ui.mouseDeltaPos.y = 0;
+			var dist = Math.sqrt((touch0.x - touch1.x)*(touch0.x - touch1.x) + (touch0.y - touch1.y)*(touch0.y - touch1.y));
+			var delta = dist / this.touchDist;
+			this.touchDist = dist;
+			if (this.handler.pinch) {
+				if (this.handler.pinch(this.gl, delta, x, y) != false) {
+					this.requestDraw();
+				}
+			}
+			if (e.preventDefault) {
+				e.preventDefault();
+			}
 		}
 	},
 
-	touchEnd : function(e) {
-		this.ui.mouseUpEvent = e.changedTouches[0];
-		var xy = this._getMouseClientPos(e.changedTouches[0]);
-		var x = xy.x;
-		var y = this.canvas.height - 1 - xy.y;
-		this.ui.mousePrevPos.x = x;
-		this.ui.mousePrevPos.y = y;
-		this.ui.mousePos.x = x;
-		this.ui.mousePos.y = y;
+	manageTouchEnd : function(e) {
+		this.ui.mousePrevPos.x = 0;
+		this.ui.mousePrevPos.y = 0;
+		this.ui.mousePos.x = 0;
+		this.ui.mousePos.y = 0;
 		this.ui.mouseDeltaPos.x = 0;
 		this.ui.mouseDeltaPos.y = 0;
 		this.ui.mouseButtonsDown[0] = false;
-		if (this.handler.mouseUp) {
-			if (this.handler.mouseUp(this.gl, 0, x, y) != false) {
-				this.requestDraw();
-			}
-		}
-		if (e.preventDefault) {
-			e.preventDefault();
-		}
-	},
-
-	touchMove : function(e) {
-		this.ui.mouseMoveEvent = e.changedTouches[0];
-		var xy = this._getMouseClientPos(e.changedTouches[0]);
-		var x = xy.x;
-		var y = this.canvas.height - 1 - xy.y;
-		this.ui.mousePrevPos.x = this.ui.mousePos.x;
-		this.ui.mousePrevPos.y = this.ui.mousePos.y;
-		this.ui.mousePos.x = x;
-		this.ui.mousePos.y = y;
-		this.ui.mouseDeltaPos.x = this.ui.mousePos.x - this.ui.mousePrevPos.x;
-		this.ui.mouseDeltaPos.y = this.ui.mousePos.y - this.ui.mousePrevPos.y;
-		if (this.handler.mouseMove) {
-			if (this.handler.mouseMove(this.gl, x, y) != false) {
+		if (this.handler.mouseDown) {
+			if (this.handler.mouseUp(this.gl, 0, 0, 0) != false) {
 				this.requestDraw();
 			}
 		}
